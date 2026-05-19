@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+
+venv/
+.venv/
+
+build/
+dist/
+installer-output/
+
+audio_in/*
+text_out/*
+models/
+
+*.log
+*.tmp
