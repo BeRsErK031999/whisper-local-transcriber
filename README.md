@@ -9,8 +9,9 @@ and writes UTF-8 `.txt` transcripts to `text_out`.
 
 - Local transcription without sending audio to an external API.
 - Russian transcription by default.
-- Batch processing for all supported files in `audio_in`.
+- Batch processing for all supported files in the selected audio folder.
 - Single-file selection through the desktop UI.
+- User-selectable input audio folder and output text folder.
 - Progress bar, percentage, current stage, elapsed time, and queue counter.
 - `small` and `medium` model selection.
 - Inno Setup installer that can be installed without administrator rights.
@@ -23,6 +24,9 @@ and writes UTF-8 `.txt` transcripts to `text_out`.
 
 When running the packaged executable from `dist`, these folders are created
 next to `dist/whisper-local-app.exe`.
+
+The desktop UI also lets users choose custom folders for input audio and
+generated text. The default folders are only a starting point.
 
 ## Supported Audio Formats
 

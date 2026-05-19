@@ -24,19 +24,17 @@ class WhisperTranscriberApp:
 
         self.root = root
         self.root.title("Whisper Transcriber")
-        self.root.geometry("820x560")
-        self.root.minsize(760, 520)
+        self.root.geometry("880x600")
+        self.root.minsize(800, 560)
+
+        self.audio_input_dir = AUDIO_INPUT_DIR
+        self.text_output_dir = TEXT_OUTPUT_DIR
 
         self.selected_file = tk.StringVar(value="Файл не выбран")
         self.status_text = tk.StringVar(value="Готово к распознаванию")
         self.stage_text = tk.StringVar(value="Ожидание")
         self.progress_text = tk.StringVar(value="0%")
-        self.folder_text = tk.StringVar(
-            value=(
-                f"Входящие аудио: {AUDIO_INPUT_DIR}\n"
-                f"Готовый текст: {TEXT_OUTPUT_DIR}"
-            )
-        )
+        self.folder_text = tk.StringVar()
         self.model_name = tk.StringVar(value="small")
         self.progress_value = tk.DoubleVar(value=0)
         self.file_counter_text = tk.StringVar(value="Файлов в очереди: 0")
@@ -48,6 +46,7 @@ class WhisperTranscriberApp:
 
         self._configure_style()
         self._build_ui()
+        self._sync_folder_text()
         self._refresh_queue_count()
 
     def _configure_style(self) -> None:
@@ -80,22 +79,22 @@ class WhisperTranscriberApp:
         description = ttk.Label(
             header,
             text=(
-                "Положите аудио в audio_in или выберите отдельный файл. "
-                "Результат сохраняется в text_out рядом с приложением."
+                "Выберите папку с аудио и папку для текста. "
+                "Можно обработать всю папку или выбрать один отдельный файл."
             ),
             style="Muted.TLabel",
-            wraplength=760,
+            wraplength=820,
             justify="left",
         )
         description.pack(anchor="w", pady=(6, 0))
 
-        folders_frame = ttk.LabelFrame(container, text="Папки", padding=14)
+        folders_frame = ttk.LabelFrame(container, text="Рабочие папки", padding=14)
         folders_frame.pack(fill="x", pady=(18, 0))
 
         folders_label = ttk.Label(
             folders_frame,
             textvariable=self.folder_text,
-            wraplength=740,
+            wraplength=800,
             justify="left",
         )
         folders_label.pack(anchor="w")
@@ -103,17 +102,31 @@ class WhisperTranscriberApp:
         folder_buttons = ttk.Frame(folders_frame)
         folder_buttons.pack(anchor="w", pady=(12, 0))
 
+        self.choose_input_button = ttk.Button(
+            folder_buttons,
+            text="Выбрать папку аудио",
+            command=self.choose_audio_input_dir,
+        )
+        self.choose_input_button.pack(side="left")
+
+        self.choose_output_button = ttk.Button(
+            folder_buttons,
+            text="Выбрать папку текста",
+            command=self.choose_text_output_dir,
+        )
+        self.choose_output_button.pack(side="left", padx=(10, 0))
+
         self.open_input_button = ttk.Button(
             folder_buttons,
-            text="Открыть audio_in",
-            command=lambda: self.open_directory(AUDIO_INPUT_DIR),
+            text="Открыть аудио",
+            command=lambda: self.open_directory(self.audio_input_dir),
         )
-        self.open_input_button.pack(side="left")
+        self.open_input_button.pack(side="left", padx=(10, 0))
 
         self.open_output_button = ttk.Button(
             folder_buttons,
-            text="Открыть text_out",
-            command=lambda: self.open_directory(TEXT_OUTPUT_DIR),
+            text="Открыть текст",
+            command=lambda: self.open_directory(self.text_output_dir),
         )
         self.open_output_button.pack(side="left", padx=(10, 0))
 
@@ -147,7 +160,7 @@ class WhisperTranscriberApp:
 
         self.process_folder_button = ttk.Button(
             actions,
-            text="Обработать audio_in",
+            text="Обработать выбранную папку",
             command=self.process_input_folder,
         )
         self.process_folder_button.pack(side="left")
@@ -189,7 +202,7 @@ class WhisperTranscriberApp:
             details,
             textvariable=self.status_text,
             style="Muted.TLabel",
-            wraplength=560,
+            wraplength=600,
             justify="right",
         )
         self.status_label.pack(side="right")
@@ -200,13 +213,43 @@ class WhisperTranscriberApp:
         self.file_label = ttk.Label(
             file_frame,
             textvariable=self.selected_file,
-            wraplength=740,
+            wraplength=800,
             justify="left",
         )
         self.file_label.pack(anchor="nw")
 
+    def choose_audio_input_dir(self) -> None:
+        if self.is_processing:
+            return
+
+        directory = filedialog.askdirectory(
+            title="Выберите папку с аудио",
+            initialdir=str(self.audio_input_dir),
+        )
+        if not directory:
+            return
+
+        self.audio_input_dir = Path(directory)
+        self._sync_folder_text()
+        self._refresh_queue_count()
+
+    def choose_text_output_dir(self) -> None:
+        if self.is_processing:
+            return
+
+        directory = filedialog.askdirectory(
+            title="Выберите папку для текста",
+            initialdir=str(self.text_output_dir),
+        )
+        if not directory:
+            return
+
+        self.text_output_dir = Path(directory)
+        self.text_output_dir.mkdir(parents=True, exist_ok=True)
+        self._sync_folder_text()
+
     def open_directory(self, directory: Path) -> None:
-        ensure_project_directories()
+        directory.mkdir(parents=True, exist_ok=True)
         os.startfile(directory)
         self._refresh_queue_count()
 
@@ -216,7 +259,7 @@ class WhisperTranscriberApp:
 
         file_path = filedialog.askopenfilename(
             title="Выберите аудиофайл",
-            initialdir=str(AUDIO_INPUT_DIR),
+            initialdir=str(self.audio_input_dir),
             filetypes=[
                 ("Audio Files", "*.mp3 *.wav *.m4a *.flac *.ogg"),
                 ("All Files", "*.*"),
@@ -240,11 +283,11 @@ class WhisperTranscriberApp:
         if self.is_processing:
             return
 
-        audio_files = list_audio_files()
+        audio_files = list_audio_files(self.audio_input_dir)
         if not audio_files:
             messagebox.showwarning(
                 "Нет файлов",
-                f"В папке нет аудиофайлов:\n{AUDIO_INPUT_DIR}",
+                f"В выбранной папке нет аудиофайлов:\n{self.audio_input_dir}",
             )
             self._refresh_queue_count()
             return
@@ -276,6 +319,8 @@ class WhisperTranscriberApp:
 
         self.process_folder_button.config(state=button_state)
         self.select_button.config(state=button_state)
+        self.choose_input_button.config(state=button_state)
+        self.choose_output_button.config(state=button_state)
         self.open_input_button.config(state=button_state)
         self.open_output_button.config(state=button_state)
         self.refresh_button.config(state=button_state)
@@ -345,7 +390,7 @@ class WhisperTranscriberApp:
             progress_callback=progress_callback,
             status_callback=status_callback,
         )
-        output_path = build_output_path(file_path)
+        output_path = build_output_path(file_path, self.text_output_dir)
         output_path.write_text(text, encoding="utf-8")
         return output_path
 
@@ -372,7 +417,7 @@ class WhisperTranscriberApp:
             "Готово",
             (
                 f"Обработано файлов: {len(output_paths)}\n"
-                f"Результаты сохранены в:\n{TEXT_OUTPUT_DIR}"
+                f"Результаты сохранены в:\n{self.text_output_dir}"
             ),
         )
 
@@ -384,10 +429,16 @@ class WhisperTranscriberApp:
 
     def _refresh_queue_count(self) -> None:
         try:
-            count = len(list_audio_files())
+            count = len(list_audio_files(self.audio_input_dir))
         except FileNotFoundError:
             count = 0
         self.file_counter_text.set(f"Файлов в очереди: {count}")
+
+    def _sync_folder_text(self) -> None:
+        self.folder_text.set(
+            f"Папка аудио: {self.audio_input_dir}\n"
+            f"Папка текста: {self.text_output_dir}"
+        )
 
     def _tick_timer(self) -> None:
         if not self.is_processing:
